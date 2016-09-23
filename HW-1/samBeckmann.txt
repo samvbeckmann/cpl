@@ -1,0 +1,10 @@
+let rec Map func list =
+  match list with
+  | [] -> []
+  | hd :: tail -> (func hd) :: (Map func tail);;
+
+let rec Filter func list =
+  match list with
+  | [] -> []
+  | hd :: tail when func hd -> hd :: Filter func tail
+  | hd :: tail -> Filter func tail;;
