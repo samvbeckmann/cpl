@@ -1,6 +1,6 @@
 :- table expression/2, expr_val/3.
 
-assign([id | [equal_sign | S]], R) :- expression(S, R).
+assign([id, equal_sign | S], R) :- expression(S, R).
 expression([0 | R], R).
 expression([1 | R], R).
 expression([2 | R], R).
@@ -16,7 +16,8 @@ expression([lt_paren | S], R) :- expression(S, [rt_paren | R]).
 expression(S, R) :- expression(S, [add_op | T]), expression(T, R).
 expression(S, R) :- expression(S, [mul_op | T]), expression(T, R).
 
-assign_val([id | [equal_sign | S]], R, V) :- expr_val(S, R, V).
+% Value section
+assign_val([id, equal_sign | S], R, V) :- expr_val(S, R, V).
 
 expr_val([0 | R], R, 0).
 expr_val([1 | R], R, 1).
