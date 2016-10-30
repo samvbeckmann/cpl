@@ -2,3 +2,8 @@
 *.xwam
 *.out
 *.zip
+.DS_Store
+.idea/
+CMakeLists.txt
+*.fa
+*.log
