@@ -43,7 +43,6 @@ func main() {
         for i := 0; i < len(motif_lens); i++ {
                 motif_templates[i] = <-ch
                 motif_f.WriteString(motif_templates[i] + "\n")
-                // fmt.Println(motif_templates[i]) // TODO: Write to file
         }
 
         for i := 0; i < seq_num; i++ {
@@ -52,7 +51,6 @@ func main() {
 
         for i := 0; i < seq_num; i++ {
                 seq_f.WriteString(<-ch + "\n")
-                // fmt.Println(<-ch)
         }
 
         motif_f.Sync()
@@ -75,7 +73,6 @@ func get_rand_char() string {
 }
 
 func gen_motif(len int, motif_num int, c chan<- string) {
-        // var result string = "m" + strconv.Itoa(motif_num) + " "
         var result string
         for i := 0; i < len; i++ {
                 result += get_rand_char()
