@@ -34,12 +34,23 @@ func main() {
 
         ch := make(chan string)
 
-        for _, i := range motif_lens  {
+        for n, i := range motif_lens  {
                 var int_len, _ = strconv.Atoi(i)
-                go gen_motif(int_len, ch)
+                go gen_motif(int_len, n, ch)
         }
 
+        motif_templates := make([]string, len(motif_lens))
+
         for i := 0; i < len(motif_lens); i++ {
+                motif_templates[i] = <-ch
+                fmt.Println(motif_templates[i]) // TODO: Write to file
+        }
+
+        for i := 0; i < seq_num; i++ {
+                go gen_sequence(seq_len, active_len, min_motifs, mutation_num, motif_templates, ch)
+        }
+
+        for i := 0; i < seq_num; i++ {
                 fmt.Println(<-ch)
         }
 }
@@ -59,10 +70,55 @@ func get_rand_char() string {
         }
 }
 
-func gen_motif(len int, c chan<- string) {
+func gen_motif(len int, motif_num int, c chan<- string) {
+        // var result string = "m" + strconv.Itoa(motif_num) + " "
         var result string
         for i := 0; i < len; i++ {
                 result += get_rand_char()
         }
         c <- result
+}
+
+func gen_sequence(length int, active_len int, min_motifs int, mutations int, motifs_ref []string, c chan<- string) {
+        var motifs = motifs_ref
+        var header string = ">"
+        var sequence string
+        starting_point := rand.Int() % (length - active_len)
+        current_pos := starting_point
+        for i := 0; i < min_motifs; i++ {
+                chosen_motif := rand.Int() % len(motifs)
+                motif := motifs[chosen_motif]
+                motifs = append(motifs[:chosen_motif], motifs[chosen_motif+1:]...)
+                header += " m" + strconv.Itoa(chosen_motif) + " " + strconv.Itoa(len(motif)) + " " + strconv.Itoa(current_pos)
+                sequence += gen_mutation(motif, mutations)
+                current_pos += len(motif)
+        }
+        c <- header + "\n" + sequence
+}
+
+// Deterministic algorithm
+func gen_mutation(motif string, num_mut int) string {
+        var mutation string = motif
+        for i := 0; i < num_mut; i++ {
+                prev := mutation[0:i]
+                post := mutation[i+1:len(mutation)]
+                newchar := get_next_char(mutation[i])
+                mutation = prev + newchar + post
+        }
+        return mutation
+}
+
+func get_next_char(char byte) string {
+        switch (char) {
+        case 64:
+                return "C"
+        case 67:
+                return "G"
+        case 71:
+                return "T"
+        case 84:
+                return "A"
+        default:
+                return "A"
+        }
 }
