@@ -4,6 +4,8 @@ import (
   "flag"
   "fmt"
   "strings"
+  "math/rand"
+  "strconv"
   )
 
 var seq_len int
@@ -29,4 +31,38 @@ func main() {
   fmt.Printf("Mutation Number: %d\n", mutation_num)
   fmt.Printf("Minimum Motifs: %d\n", min_motifs)
   fmt.Printf("Active Sub-region length: %d\n", active_len)
+
+  ch := make(chan string)
+
+  for _, i := range motif_lens  {
+    var int_len, _ = strconv.Atoi(i)
+    go gen_motif(int_len, ch)
+  }
+
+  for i := 0; i < len(motif_lens); i++ {
+    fmt.Println(<-ch)
+  }
+}
+
+func get_rand_char() string {
+  switch (rand.Int() % 4) {
+  case 0:
+    return "A"
+  case 1:
+    return "C"
+  case 2:
+    return "G"
+  case 3:
+    return "T"
+  default:
+    return "X"
+  }
+}
+
+func gen_motif(len int, c chan string) {
+  var result string
+  for i := 0; i < len; i++ {
+		result += get_rand_char()
+	}
+  c <- result
 }
