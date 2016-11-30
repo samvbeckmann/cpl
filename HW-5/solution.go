@@ -1,3 +1,8 @@
+/**
+ * CPL project 5
+ * Copywrite Sam Beckmann
+ * All Rights Reserved
+ */
 package main
 
 import (
@@ -8,31 +13,30 @@ import (
         "strconv"
 )
 
-var seq_len int
-var seq_num int
-var motif_lens_str string
-var mutation_num int
-var min_motifs int
-var active_len int
-
 func main() {
+
+        var seq_len int
+        var seq_num int
+        var motif_lens_str string
+        var mutation_nums string
+        var min_motifs int
+        var active_len int
+
         flag.IntVar(&seq_len, "sequence-length", 500, "the length of a sequence")
         flag.IntVar(&seq_num, "sequence-number", 100, "the number of sequences to be generated")
         flag.StringVar(&motif_lens_str, "motif-lengths", "15,16,17,18,19,20", "a comma-separated list of motif lengths")
-        flag.IntVar(&mutation_num, "mutation-number", 2, "the number of mutations per motif")
+        flag.StringVar(&mutation_nums, "mutation-numbers", "1,2,3,3,2,1", "the number of mutations per motif")
         flag.IntVar(&min_motifs, "min-motifs", 3, "The minimum number of motifs in a sequence")
         flag.IntVar(&active_len, "active-length", 150, "length of the active sub-region in the sequence")
 
         var motif_lens = strings.Split(motif_lens_str, ",")
+        var mut_nums_str = strings.Split(mutation_nums, ",")
 
-        ch := make(chan string)
-
-        for n, i := range motif_lens  {
-                var int_len, _ = strconv.Atoi(i)
-                go gen_motif(int_len, n, ch)
+        mut_nums := make([]int, len(mut_nums_str))
+        for n, i := range mut_nums_str {
+                mut_nums[n], _ = strconv.Atoi(i)
         }
 
-        motif_templates := make([]string, len(motif_lens))
 
         motif_f, _ := os.Create("motifs.txt")
         defer motif_f.Close()
@@ -40,17 +44,28 @@ func main() {
         seq_f, _ := os.Create("sequences.txt")
         defer seq_f.Close()
 
+        motif_templates := make([]string, len(motif_lens))
+
+        ch := make(chan string)
+        for n, i := range motif_lens {
+                var value, _ = strconv.Atoi(i)
+                go gen_template(value, n, ch)
+        }
+
         for i := 0; i < len(motif_lens); i++ {
                 motif_templates[i] = <-ch
                 motif_f.WriteString(motif_templates[i] + "\n")
         }
 
-        for i := 0; i < seq_num; i++ {
-                go gen_sequence(seq_len, i, active_len, min_motifs, mutation_num, motif_templates, ch)
-        }
+        rand_chan := make(chan string)
+        motif_chan := make(chan string)
+
+        go gen_motif(motif_templates, mut_nums, motif_chan)
+        go gen_rand_seq(rand_chan)
 
         for i := 0; i < seq_num; i++ {
-                seq_f.WriteString(<-ch + "\n")
+                seq := gen_sequence(seq_len, i, active_len, min_motifs, motif_templates, mut_nums, motif_chan, rand_chan)
+                seq_f.WriteString(seq + "\n")
         }
 
         motif_f.Sync()
@@ -58,7 +73,7 @@ func main() {
 }
 
 func get_rand_char() string {
-        switch (rand.Int() % 4) {
+        switch (rand.Intn(4)) {
         case 0:
                 return "A"
         case 1:
@@ -72,7 +87,7 @@ func get_rand_char() string {
         }
 }
 
-func gen_motif(len int, motif_num int, c chan<- string) {
+func gen_template(len int, motif_num int, c chan<- string) {
         var result string
         for i := 0; i < len; i++ {
                 result += get_rand_char()
@@ -80,37 +95,61 @@ func gen_motif(len int, motif_num int, c chan<- string) {
         c <- result
 }
 
-func gen_sequence(length int, seq_num int, active_len int, min_motifs int, mutations int, motifs_ref []string, c chan<- string) {
-        var avail_motifs = make([]int, 0)
-        for i := 0; i < len(motifs_ref); i++ {
-                avail_motifs = append(avail_motifs, i)
-        }
-        var header string = ">seq" + strconv.Itoa(seq_num)
+func gen_sequence(length int, seq_num int, active_len int,
+                         min_motifs int, motifs []string, mut_nums []int,
+                         motif_chan <-chan string, rand_chan <-chan string) string {
+
+        var start_loc int
         var sequence string
-        starting_point := rand.Intn(length - active_len)
-        current_pos := starting_point
-        for i := 0; i < min_motifs; i++ {
-                chosen_index := rand.Intn(len(avail_motifs))
-                chosen_motif := avail_motifs[chosen_index]
-                avail_motifs = append(avail_motifs[:chosen_index], avail_motifs[chosen_index+1:]...)
-                motif := motifs_ref[chosen_motif]
-                header += " m" + strconv.Itoa(chosen_motif) + " " + strconv.Itoa(len(motif)) + " " + strconv.Itoa(current_pos)
-                sequence += gen_mutation(motif, mutations)
-                current_pos += len(motif)
+        var header string
+        not_valid := true
+        for not_valid {
+                sequence = ""
+                start_loc = rand.Intn(length - active_len)
+                current_loc := start_loc
+                header = ">seq" + strconv.Itoa(seq_num)
+                num_motifs := 0
+
+                for num_motifs < min_motifs {
+                        var selection string
+                        select {
+                        case selection = <- rand_chan:
+                                sequence += selection
+                                current_loc += len(selection)
+                        case selection = <- motif_chan:
+                                split := strings.Split(selection, ",")
+                                header += split[0] + " " + strconv.Itoa(current_loc) + " " + strconv.Itoa(len(split[1]) - 1 + current_loc)
+                                sequence += split[1]
+                                num_motifs++
+                                current_loc += len(split[1])
+                        }
+                }
+
+                not_valid = len(sequence) > active_len
         }
+
         var pre string
-        for i := 0; i < starting_point; i++ {
+        for i := 0; i < start_loc; i++ {
                 pre += get_rand_char()
         }
 
         sequence = pre + sequence
+
         for len(sequence) < length {
                 sequence += get_rand_char()
         }
-        c <- header + "\n" + sequence
+
+        return header + "\n" + sequence
 }
 
-// Deterministic algorithm
+func gen_motif(motifs []string, muts []int, c chan<- string) {
+        for {
+                motif := rand.Intn(len(motifs))
+                c <- " m" + strconv.Itoa(motif) + "," + gen_mutation(motifs[motif], muts[motif])
+        }
+}
+
+// Deterministic algorithm TODO
 func gen_mutation(motif string, num_mut int) string {
         var mutation string = motif
         for i := 0; i < num_mut; i++ {
@@ -134,5 +173,17 @@ func get_next_char(char byte) string {
                 return "A"
         default:
                 return "A"
+        }
+}
+
+func gen_rand_seq(c chan<- string) {
+        var result string = ""
+        for {
+                if rand.Intn(10) == 0 {
+                        c <- result
+                        result = ""
+                } else {
+                        result += get_rand_char()
+                }
         }
 }
