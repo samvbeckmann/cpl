@@ -151,28 +151,23 @@ func gen_motif(motifs []string, muts []int, c chan<- string) {
 
 // Deterministic algorithm TODO
 func gen_mutation(motif string, num_mut int) string {
+        mut_chance := float32(num_mut) / float32(len(motif))
         var mutation string = motif
+        num_muts := 0
         for i := 0; i < num_mut; i++ {
-                prev := mutation[0:i]
-                post := mutation[i+1:len(mutation)]
-                newchar := get_next_char(mutation[i])
-                mutation = prev + newchar + post
+                if (rand.Float32() < mut_chance) {
+                    newchar := get_rand_char()
+                    for newchar == string(mutation[i]) {
+                        newchar = get_rand_char()
+                    }
+                    mutation = mutation[:i] + newchar + mutation[i+1:]
+                    num_muts++
+                }
         }
-        return mutation
-}
-
-func get_next_char(char byte) string {
-        switch (char) {
-        case 64:
-                return "C"
-        case 67:
-                return "G"
-        case 71:
-                return "T"
-        case 84:
-                return "A"
-        default:
-                return "A"
+        if (num_muts == num_mut) {
+            return mutation
+        } else {
+            return gen_mutation(motif, num_mut)
         }
 }
 
